@@ -1,0 +1,155 @@
+from google.colab import drive
+drive.mount('/content/drive')
+
+!pip install -q keras
+
+from keras.models import Sequential
+from keras.layers import Conv2D
+from keras.layers import MaxPooling2D
+from keras.layers import Flatten
+from keras.layers import Dense
+from keras.layers import BatchNormalization
+from keras.layers import Dense
+from keras.layers import Dropout
+from keras.layers import Activation
+from tensorflow.keras.optimizers import Adam
+from keras.preprocessing.image import ImageDataGenerator
+import tensorflow as tf
+
+#img_size=30
+batch_size=32
+#num_of_train_samples = 4150
+#num_of_test_samples = 1782
+train_datagen = ImageDataGenerator(rescale = 1./255,
+                                   shear_range = 0.2,
+                                   zoom_range = 0.2,
+                                   validation_split=0.3,
+                                   horizontal_flip = True)
+
+test_datagen = ImageDataGenerator(rescale=1./255, validation_split=0.3)
+
+training_set = train_datagen.flow_from_directory('/content/drive/MyDrive/output1/train',
+                                                 target_size = (30,30),
+                                                 batch_size = batch_size,
+                                                 color_mode="grayscale",
+                                                 class_mode = 'categorical',
+                                                 shuffle=True)
+
+test_set = test_datagen.flow_from_directory('/content/drive/MyDrive/output1/test',
+                                            target_size = (30,30),
+                                            batch_size = batch_size,
+                                            color_mode="grayscale",
+                                            class_mode = 'categorical',
+                                            shuffle=True)
+
+# Initialising the CNN
+
+cnn_classifier=Sequential();
+
+#Layer 1
+cnn_classifier.add(Conv2D(32,(3,3),padding='same',input_shape=(30,30,1)))
+cnn_classifier.add(BatchNormalization())
+cnn_classifier.add(Activation('relu'))
+cnn_classifier.add(MaxPooling2D(pool_size=(2,2)))
+cnn_classifier.add(Dropout(0.25))
+
+#Layer 2
+cnn_classifier.add(Conv2D(64,(3,3),padding='same'))
+cnn_classifier.add(BatchNormalization())
+cnn_classifier.add(Activation('relu'))
+cnn_classifier.add(MaxPooling2D(pool_size=(2,2)))
+cnn_classifier.add(Dropout(0.25))
+
+#Layer 3
+cnn_classifier.add(Conv2D(128,(3,3),padding='same'))
+cnn_classifier.add(BatchNormalization())
+cnn_classifier.add(Activation('relu'))
+cnn_classifier.add(MaxPooling2D(pool_size=(2,2)))
+cnn_classifier.add(Dropout(0.25))
+
+#Layer 4
+cnn_classifier.add(Conv2D(256,(3,3),padding='same'))
+cnn_classifier.add(BatchNormalization())
+cnn_classifier.add(Activation('relu'))
+cnn_classifier.add(MaxPooling2D(pool_size=(2,2)))
+cnn_classifier.add(Dropout(0.25))
+
+#Flattening
+cnn_classifier.add(Flatten())
+
+##cnn_classifier.add(Dense(units=128, activation='relu'))
+cnn_classifier.add(Dense(4, activation='softmax'))
+
+# Compiling the CNN
+opt = Adam(lr=0.0005)
+cnn_classifier.compile(optimizer = opt,loss='binary_crossentropy',metrics=['accuracy'])
+
+
+steps_per_epoch = training_set.n//training_set.batch_size
+validation_steps = test_set.n//test_set.batch_size
+
+cnn_classifier.fit(
+                        training_set,
+                        steps_per_epoch = steps_per_epoch,
+                        epochs = ,
+                        validation_data = test_set,
+                        validation_steps = validation_steps)
+
+# evaluate the model
+_, train_acc = cnn_classifier.evaluate(training_set, verbose=0)
+_, test_acc = cnn_classifier.evaluate(test_set, verbose=0)
+print('Train: %.3f, test: %.3f' % (train_acc, test_acc))
+
+import matplotlib.pyplot as plt
+
+# summarize history for accuracy
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+# summarize history for loss
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+from sklearn.metrics import classification_report, confusion_matrix
+import numpy as np
+
+Y_pred = cnn_classifier.predict_generator(test_set, test_set.n // batch_size+1) #(test_set, num_of_test_samples // batch_size+1)
+y_pred = np.argmax(Y_pred, axis=1)
+cm = confusion_matrix(test_set.classes, y_pred)
+print('Confusion Matrix')
+print(cm)
+
+
+from sklearn.metrics import classification_report
+
+print('Classification Report')
+target_names = test_set.classes
+class_labels = list(test_set.class_indices.keys())   
+report = classification_report(target_names, y_pred, target_names=class_labels)
+print(report) 
+
+from sklearn.metrics import roc_curve, auc
+fpr, tpr, _ = roc_curve(test_set.classes, preds)
+roc_auc = auc(fpr, tpr)
+plt.figure()
+lw = 2
+plt.plot(fpr, tpr, color='darkorange',
+lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
+plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver operating characteristic example')
+plt.legend(loc="lower right")
+plt.show()
